@@ -3,6 +3,7 @@
 #include "defines/defines.h"
 #include "defines/globals.h"
 #include "utils/common_utils.h"
+#include "utils/window_utils.h"
 #include <debugapi.h>
 #include <minwindef.h>
 #include <string>
@@ -110,7 +111,7 @@ void PaintCandidates(HWND hwnd, std::wstring &text)
 
     float lineHeight = 26.0f; //
     float x = 8.0f;           //
-    float y = 5.0f;           //
+    float y = 0.0f;           //
 
     for (size_t i = 0; i < lines.size(); ++i)
     {
@@ -166,7 +167,7 @@ LRESULT RegisterCandidateWindowMessage()
 LRESULT RegisterCandidateWindowClass(WNDCLASSEX &wcex, HINSTANCE hInstance)
 {
     wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
     wcex.lpfnWndProc = WndProc;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
@@ -174,6 +175,7 @@ LRESULT RegisterCandidateWindowClass(WNDCLASSEX &wcex, HINSTANCE hInstance)
     wcex.hIcon = LoadIcon(hInstance, IDI_APPLICATION);
     wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
     wcex.hbrBackground = NULL; // Prevent background painting, otherwise it will be flickering
+    // wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.lpszMenuName = NULL;
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
@@ -196,21 +198,21 @@ int CreateCandidateWindow(HINSTANCE hInstance)
     if (!InitD2DAndDWrite())
         return -1;
 
-    DWORD dwExStyle = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST; //
-    HWND hWnd = CreateWindowEx(                                         //
-        dwExStyle,                                                      //
-        szWindowClass,                                                  //
-        lpWindowName,                                                   //
-        WS_POPUP,                                                       //
-        300,                                                            //
-        1500,                                                           //
-        (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),              //
-        (::CANDIDATE_WINDOW_HEIGHT * 1.32 + ::SHADOW_WIDTH),            //
-        nullptr,                                                        //
-        nullptr,                                                        //
-        hInstance,                                                      //
-        nullptr                                                         //
-    );                                                                  //
+    DWORD dwExStyle = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE; //
+    HWND hWnd = CreateWindowEx(                                                            //
+        dwExStyle,                                                                         //
+        szWindowClass,                                                                     //
+        lpWindowName,                                                                      //
+        WS_POPUP,                                                                          //
+        300,                                                                               //
+        1500,                                                                              //
+        (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),                                 //
+        (26.0f * 9 * 1.5 + ::CandidateWndMargin),                                          //
+        nullptr,                                                                           //
+        nullptr,                                                                           //
+        hInstance,                                                                         //
+        nullptr                                                                            //
+    );                                                                                     //
 
     if (!hWnd)
     {
@@ -232,14 +234,14 @@ int CreateCandidateWindow(HINSTANCE hInstance)
 
     ::global_hwnd = hWnd;
 
-    SetWindowPos(                                            //
-        hWnd,                                                //
-        HWND_TOPMOST,                                        //
-        300,                                                 //
-        1500,                                                //
-        (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),   //
-        (::CANDIDATE_WINDOW_HEIGHT * 1.32 + ::SHADOW_WIDTH), //
-        SWP_SHOWWINDOW);                                     //
+    SetWindowPos(                                          //
+        hWnd,                                              //
+        HWND_TOPMOST,                                      //
+        300,                                               //
+        1500,                                              //
+        (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH), //
+        (26.0f * 9 * 1.5 + ::CandidateWndMargin),          //
+        SWP_SHOWWINDOW);                                   //
 
     ShowWindow(hWnd, SW_SHOW);
     UpdateWindow(hWnd);
@@ -273,37 +275,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         int caretX = Global::Point[0];
         int caretY = Global::Point[1];
 
-        if (caretY < -900)
-        {
-            MoveWindow(                                              //
-                hWnd,                                                //
-                caretX,                                              //
-                caretY,                                              //
-                (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),   //
-                (::CANDIDATE_WINDOW_HEIGHT * 1.32 + ::SHADOW_WIDTH), //
-                TRUE                                                 //
-            );                                                       //
-        }
-        else
-        {
-            MoveWindow(                                              //
-                hWnd,                                                //
-                caretX,                                              //
-                caretY,                                              //
-                (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),   //
-                (::CANDIDATE_WINDOW_HEIGHT * 1.32 + ::SHADOW_WIDTH), //
-                TRUE                                                 //
-            );                                                       //
-        }
-        ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+        POINT pt = {caretX, caretY};
+        std::shared_ptr<std::pair<int, int>> properPos = std::make_shared<std::pair<int, int>>();
+        std::pair<double, double> containerSize = {
+            ::CANDIDATE_WINDOW_WIDTH * 1.3,                      //
+            26.0f * (Global::CandidateWordList.size() + 1) * 1.5 //
+        };
+        // AdjustCandidateWindowPosition(&pt, containerSize, properPos);
         ::ReadDataFromSharedMemory(0b100000);
-        std::wstring embeded_pinyin = string_to_wstring(                             //
-            PinyinUtil::pinyin_segmentation(wstring_to_string(Global::PinyinString)) //
-        );
-        std::wstring str = embeded_pinyin + L"," + Global::CandidateString;
-        boost::algorithm::replace_all(str, ",", "\n");
         // TODO: rewrite InflateCandidateWindow(str);
-        PaintCandidates(hWnd, str);
+        SetWindowPos(                                                                            //
+            hWnd,                                                                                //
+            nullptr,                                                                             //
+            0,                                                                                   //
+            0,                                                                                   //
+            (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),                                   //
+            (26.0f * (Global::CandidateWordList.size() + 1) * 1.5 + ::CandidateWndMargin * 1.5), //
+            SWP_NOMOVE | SWP_NOZORDER                                                            //
+        );
+        InvalidateRect(hWnd, NULL, FALSE);
+        ShowWindow(hWnd, SW_SHOWNOACTIVATE);
         return 0;
     }
     if (message == WM_HIDE_MAIN_WINDOW)
@@ -316,33 +307,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         int caretX = Global::Point[0];
         int caretY = Global::Point[1];
-        if (caretY < -900)
-        {
-            MoveWindow(                                              //
-                hWnd,                                                //
-                caretX,                                              //
-                caretY,                                              //
-                (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),   //
-                (::CANDIDATE_WINDOW_HEIGHT * 1.32 + ::SHADOW_WIDTH), //
-                TRUE                                                 //
-            );                                                       //
-        }
-        else
-        {
-            MoveWindow(                                              //
-                hWnd,                                                //
-                caretX,                                              //
-                caretY,                                              //
-                (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),   //
-                (::CANDIDATE_WINDOW_HEIGHT * 1.32 + ::SHADOW_WIDTH), //
-                TRUE                                                 //
-            );                                                       //
-        }
+        SetWindowPos(                 //
+            hWnd,                     //
+            nullptr,                  //
+            caretX,                   //
+            caretY,                   //
+            0,                        //
+            0,                        //
+            SWP_NOSIZE | SWP_NOZORDER //
+        );
         return 0;
     }
 
     switch (message)
     {
+
+    case WM_ERASEBKGND:
+        return 1;
+
     case WM_CREATE:
         if (!InitD2DRenderTarget(hWnd))
         {
@@ -362,6 +344,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     }
+
+    case WM_SIZE: {
+        if (pRenderTarget)
+        {
+            UINT width = LOWORD(lParam);
+            UINT height = HIWORD(lParam);
+            pRenderTarget->Resize(D2D1::SizeU(width, height));
+        }
+        return 0;
+    }
+
+    case WM_PAINT: {
+        std::wstring embeded_pinyin = string_to_wstring(                             //
+            PinyinUtil::pinyin_segmentation(wstring_to_string(Global::PinyinString)) //
+        );
+        std::wstring str = embeded_pinyin + L"," + Global::CandidateString;
+        boost::algorithm::replace_all(str, ",", "\n");
+        PaintCandidates(hWnd, str);
+        return 0;
+    }
+
     case WM_DESTROY: {
         PostQuitMessage(0);
         break;
