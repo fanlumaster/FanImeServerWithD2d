@@ -1,11 +1,5 @@
 # Front end of FanIME
 
-This is the front end of [FanIMETsf](https://github.com/fanlumaster/FanImeTsf).
+So finally, we must, yeah, still must use d2d to render our candidate window in some occasions, cause we must use uiaccess to get our window truely top-most.(webview2 cannot use uiaccess, so I hate you msft!)
 
-Not only the UI, but also IME engine.
-
-![](https://s2.loli.net/2025/03/20/4ZdbHLWAeBJOqIo.png)
-
-![](https://s2.loli.net/2025/03/24/n1X7RZr9LjEWO23.png)
-
-![](https://s2.loli.net/2025/04/24/xSWUb2Ref74KTmQ.png)
+![](https://s2.loli.net/2025/05/07/UVcPdTIno8mE1pz.png)
