@@ -14,10 +14,14 @@
 #include <d2d1.h>
 #include <dwrite.h>
 #include <dwmapi.h>
+#include <wrl.h>
+// #include "fmt/xchar.h"
 
 #pragma comment(lib, "d2d1")
 #pragma comment(lib, "dwrite")
 #pragma comment(lib, "dwmapi.lib")
+
+using namespace Microsoft::WRL;
 
 ID2D1Factory *pD2DFactory = nullptr;
 ID2D1HwndRenderTarget *pRenderTarget = nullptr;
@@ -87,6 +91,58 @@ bool InitD2DRenderTarget(HWND hwnd)
     return SUCCEEDED(hr);
 }
 
+bool IsHalfWidth(wchar_t ch)
+{
+    return (ch >= L'0' && ch <= L'9')    //
+           || (ch >= L'A' && ch <= L'Z') //
+           || (ch >= L'a' && ch <= L'z') //
+           || ch == L'.'                 //
+           || ch == L'\''                //
+           || ch == L' ';
+}
+
+int GetMaxLenWordIndex()
+{
+    int maxLen = 0;
+    int maxIndex = 0;
+    int i = 0;
+    for (auto candWord : Global::CandidateWordList)
+    {
+        if (candWord.length() > maxLen)
+        {
+            maxLen = candWord.length();
+            maxIndex = i;
+        }
+        i++;
+    }
+
+    return maxIndex;
+}
+
+float MeasureTextWidth(IDWriteFactory *pDWriteFactory, IDWriteTextFormat *pTextFormat, const std::wstring &text)
+{
+    ComPtr<IDWriteTextLayout> pTextLayout;
+
+    HRESULT hr = pDWriteFactory->CreateTextLayout( //
+        text.c_str(),                              //
+        static_cast<UINT32>(text.length()),        //
+        pTextFormat,                               //
+        1000.0f,                                   // 最大允许宽度（足够大以避免换行）
+        1000.0f,                                   // 最大允许高度
+        &pTextLayout                               //
+    );
+
+    if (FAILED(hr) || !pTextLayout)
+        return 0.0f;
+
+    DWRITE_TEXT_METRICS metrics;
+    hr = pTextLayout->GetMetrics(&metrics);
+    if (FAILED(hr))
+        return 0.0f;
+
+    return metrics.width; // 返回精确宽度（单位：像素）
+}
+
 void PaintCandidates(HWND hwnd, std::wstring &text)
 {
     if (!pRenderTarget)
@@ -118,10 +174,19 @@ void PaintCandidates(HWND hwnd, std::wstring &text)
         if (i == 1)
         {
             float radius = 6.0f;
+            float width = MeasureTextWidth(pDWriteFactory, pTextFormat, lines[i]);
+            if (width < 56)
+            {
+                width = 56;
+            }
             D2D1_ROUNDED_RECT roundedRect = {
-                D2D1::RectF(x - 3.0f, y, x + 140.0f / 1.5 - 2, y + lineHeight - 1.0f), //
-                radius,                                                                //
-                radius                                                                 //
+                D2D1::RectF(                //
+                    x - 3.0f,               //
+                    y,                      //
+                    x + width + 5.0f,       //
+                    y + lineHeight - 1.0f), //
+                radius,                     //
+                radius                      //
             };
             pBrush->SetColor(D2D1::ColorF(D2D1::ColorF::LightBlue, 0.3f));
             pRenderTarget->FillRoundedRectangle(roundedRect, pBrush);
@@ -284,14 +349,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // AdjustCandidateWindowPosition(&pt, containerSize, properPos);
         ::ReadDataFromSharedMemory(0b100000);
         // TODO: rewrite InflateCandidateWindow(str);
-        SetWindowPos(                                                                            //
-            hWnd,                                                                                //
-            nullptr,                                                                             //
-            0,                                                                                   //
-            0,                                                                                   //
-            (::CANDIDATE_WINDOW_WIDTH * 1.3 + ::SHADOW_WIDTH),                                   //
-            (26.0f * (Global::CandidateWordList.size() + 1) * 1.5 + ::CandidateWndMargin * 1.5), //
-            SWP_NOMOVE | SWP_NOZORDER                                                            //
+        int maxIndex = GetMaxLenWordIndex();
+        int wndWidth = MeasureTextWidth(   //
+                           pDWriteFactory, //
+                           pTextFormat,    //
+                           L"1. " + Global::CandidateWordList[maxIndex]) *
+                           1.5 +
+                       20 * 1.5;
+        int wndHeight = (26.0f * (Global::CandidateWordList.size() + 1) * 1.5 + ::CandidateWndMargin * 1.5);
+        if (wndWidth < 125)
+        {
+            wndWidth = 125;
+        }
+        SetWindowPos(                 //
+            hWnd,                     //
+            nullptr,                  //
+            0,                        //
+            0,                        //
+            wndWidth,                 //
+            wndHeight,                //
+            SWP_NOMOVE | SWP_NOZORDER //
         );
         InvalidateRect(hWnd, NULL, FALSE);
         ShowWindow(hWnd, SW_SHOWNOACTIVATE);
