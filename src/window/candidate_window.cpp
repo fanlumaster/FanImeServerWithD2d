@@ -379,6 +379,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         int caretX = Global::Point[0];
         int caretY = Global::Point[1];
 
+        if (caretY < -900) // For firefox/zen browser
+        {
+            SetWindowPos(                 //
+                hWnd,                     //
+                nullptr,                  //
+                caretX,                   //
+                caretY,                   //
+                0,                        //
+                0,                        //
+                SWP_NOSIZE | SWP_NOZORDER //
+            );
+            return 0;
+        }
+
         RECT rc;
         GetClientRect(hWnd, &rc);
 
