@@ -85,3 +85,39 @@ int AdjustCandidateWindowPosition(                  //
     }
     return 0;
 }
+
+int AdjustCandidateWindowPosition( //
+    const POINT *position,         //
+    const int width,               //
+    const int height,              //
+    POINT *adjustedPos             //
+)
+{
+    HWND hwnd = GetForegroundWindow();
+    MonitorCoordinates coordinates = GetMonitorCoordinates();
+
+    static int maxHeight = height;
+    if (height > maxHeight)
+    {
+        maxHeight = height;
+    }
+
+    if (position->x < coordinates.left)
+    {
+        adjustedPos->x = coordinates.left + 2;
+    }
+    if (position->x + width > coordinates.right)
+    {
+        adjustedPos->x = coordinates.right - width - 2;
+    }
+
+    if (position->y < coordinates.top)
+    {
+        adjustedPos->y = coordinates.top + 2;
+    }
+    if (position->y + maxHeight > coordinates.bottom)
+    {
+        adjustedPos->y = position->y - height - 30 - 2;
+    }
+    return 0;
+}

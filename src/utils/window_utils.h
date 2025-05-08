@@ -12,3 +12,10 @@ int AdjustCandidateWindowPosition(       //
     const std::pair<double, double> &,   //
     std::shared_ptr<std::pair<int, int>> //
 );
+
+int AdjustCandidateWindowPosition( //
+    const POINT *position,         //
+    const int width,               //
+    const int height,              //
+    POINT *adjustedPos             //
+);

@@ -339,14 +339,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         int caretX = Global::Point[0];
         int caretY = Global::Point[1];
-
         POINT pt = {caretX, caretY};
-        std::shared_ptr<std::pair<int, int>> properPos = std::make_shared<std::pair<int, int>>();
-        std::pair<double, double> containerSize = {
-            ::CANDIDATE_WINDOW_WIDTH * 1.3,                      //
-            26.0f * (Global::CandidateWordList.size() + 1) * 1.5 //
-        };
-        // AdjustCandidateWindowPosition(&pt, containerSize, properPos);
+
         ::ReadDataFromSharedMemory(0b100000);
         // TODO: rewrite InflateCandidateWindow(str);
         int maxIndex = GetMaxLenWordIndex();
@@ -384,15 +378,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         int caretX = Global::Point[0];
         int caretY = Global::Point[1];
+
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+
+        POINT pt = {caretX, caretY};
+        int wndWidth = rc.right - rc.left;
+        int wndHeight = rc.bottom - rc.top;
+
+        POINT adjustedPos = {caretX, caretY};
+        AdjustCandidateWindowPosition( //
+            &pt,                       //
+            wndWidth,                  //
+            wndHeight,                 //
+            &adjustedPos               //
+        );
+
         SetWindowPos(                 //
             hWnd,                     //
             nullptr,                  //
-            caretX,                   //
-            caretY,                   //
+            adjustedPos.x,            //
+            adjustedPos.y,            //
             0,                        //
             0,                        //
             SWP_NOSIZE | SWP_NOZORDER //
         );
+
         return 0;
     }
 
